@@ -12,6 +12,7 @@ import redis from "redis"
 import session from "express-session"
 import connectRedis from "connect-redis"
 import cors from "cors"
+import { COOKIE_NAME } from "./constants"
 
 const main = async () => {
   const orm = await MikroORM.init(microConfig)
@@ -30,7 +31,7 @@ const main = async () => {
   )
   app.use(
     session({
-      name: "qid",
+      name: COOKIE_NAME,
       store: new RedisStore({ client: redisClient, disableTouch: true }),
       secret: "iygiutgfcjvbvygfhcfhjc",
       resave: false,
