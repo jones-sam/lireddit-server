@@ -1,19 +1,21 @@
+import { EntityManager } from "@mikro-orm/postgresql"
+import argon2 from "argon2"
+import { MyContext } from "src/types"
 import {
-  Resolver,
-  Mutation,
-  Field,
   Arg,
   Ctx,
+  Field,
+  Mutation,
   ObjectType,
   Query,
+  Resolver,
 } from "type-graphql"
-import { MyContext } from "src/types"
+import { v4 } from "uuid"
+import { COOKIE_NAME, FORGET_PASSWORD_PREFIX } from "../constants"
+import { sendEmail } from "../util/sendEmail"
 import { User } from "./../entities/User"
-import argon2 from "argon2"
-import { EntityManager } from "@mikro-orm/postgresql"
-import { COOKIE_NAME } from "../constants"
-import { UsernamePasswordInput } from "./UsernamePasswordInput"
 import { validateRegister } from "./../util/validateRegister"
+import { UsernamePasswordInput } from "./UsernamePasswordInput"
 
 @ObjectType()
 class FieldError {
@@ -35,8 +37,30 @@ class UserResponse {
 @Resolver()
 export class UserResolver {
   @Mutation(() => Boolean)
-  async forgotPassword(@Arg("email") email: string, @Ctx() { em }: MyContext) {
-    //  const user = await em.findOne(User, {email})
+  async forgotPassword(
+    @Arg("email") email: string,
+    @Ctx() { em, redis }: MyContext
+  ) {
+    const user = await em.findOne(User, { email })
+    if (!user) {
+      //  email doesn't exist in db
+      return true
+    }
+
+    const token = v4()
+    // storing token in redis, expires after 3 days
+    redis.set(
+      FORGET_PASSWORD_PREFIX + token,
+      user.id,
+      "ex",
+      1000 * 60 * 60 * 24 * 3
+    )
+
+    await sendEmail(
+      email,
+      `<a href="http://localhost:3000/change-password/${token}">reset password</a>`
+    )
+
     return true
   }
 
